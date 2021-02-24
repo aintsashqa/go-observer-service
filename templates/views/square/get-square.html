@@ -1,0 +1,95 @@
+{{ define "content" }}
+
+<div class="container">
+    <div class="btn-group" role="group" aria-label="Controls">
+        <button type="button" class="btn btn-primary" onclick="Start({{ .IsAdmin }})">Start</button>
+    </div>
+    <div class="border" id="square-component-render"></div>
+</div>
+
+{{ end }}
+
+{{ define "javascript" }}
+<script type="text/javascript">
+    const socketConnectionUrl = 'ws://localhost:8080/square/observe'
+    const squareComponentRenderRootElementId = 'square-component-render'
+    const squareComponentRenderCanvasHeight = 500
+    const squareComponentRenderCanvasStyleCursor = 'none'
+    const squareComponentRenderContextFillStyle = 'red'
+
+    let IsAdmin = false
+
+    let Socket = {
+        createConnection: function() {
+            this.connection = new WebSocket(socketConnectionUrl)
+            this.connection.onmessage = IsAdmin
+                ? function(event) {}
+                : function(event) {
+                    console.log(event)
+                    position = JSON.parse(event.data)
+                    Render(position)
+                }
+        },
+        sendMessage: function(position) {
+            this.connection.send(JSON.stringify(position))
+        }
+    }
+
+    let SquareComponent = {
+        position: {
+            x: 0,
+            y: 0
+        },
+        size: {
+            width: 30,
+            height: 30
+        },
+        setNextPosition: function({x, y}) {
+            this.position.x = x
+            this.position.y = y
+        }
+    }
+
+    let SquareComponentRender = {
+        root: document.getElementById(squareComponentRenderRootElementId),
+        canvas: document.createElement('canvas'),
+        createCanvas: function() {
+            this.canvas.width = this.root.getBoundingClientRect().width
+            this.canvas.height = squareComponentRenderCanvasHeight
+            this.canvas.style.cursor = squareComponentRenderCanvasStyleCursor
+            this.context = this.canvas.getContext('2d')
+            this.root.appendChild(this.canvas)
+            if (IsAdmin) {
+                this.canvas.addEventListener('mousemove', function(event) {
+                    let position = {
+                        x: event.offsetX - SquareComponent.size.width / 2,
+                        y: event.offsetY - SquareComponent.size.height / 2
+                    }
+    
+                    Render(position)
+                    Socket.sendMessage(position)
+                })
+            }
+        },
+        clearCanvas: function() {
+            this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
+        },
+        render: function() {
+            this.context.fillStyle = squareComponentRenderContextFillStyle
+            this.context.fillRect(SquareComponent.position.x, SquareComponent.position.y, SquareComponent.size.width, SquareComponent.size.height)
+        }
+    }
+
+    function Start(isAdmin) {
+        IsAdmin = isAdmin
+        SquareComponentRender.createCanvas()
+        Socket.createConnection()
+    }
+
+    function Render(position) {
+        SquareComponentRender.clearCanvas()
+        SquareComponent.setNextPosition(position)
+        SquareComponentRender.render()
+    }
+</script>
+{{ end }}
